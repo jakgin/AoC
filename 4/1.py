@@ -1,42 +1,39 @@
-with open("input2.txt") as f:
-    lines = f.read().split("\n")
+with open("input.txt") as f:
+    board = f.read().split("\n")
 
-word = "XMAS"
-
-def check(x: int, y: int) -> int:
-    if lines[y][x] != "X":
+def check(x, y):
+    if board[y][x] != WORD[0]:
         return 0
-    count = 0
     
-    # Check right-left
-    if len(lines[y]) >= x+len(word) and lines[y][x:x+len(word)] == word:
-        count += 1
-    if x - len(word) + 1 >= 0 and lines[y][x-len(word)+1:x+1] == word[::-1]:
-        count += 1
-    if len(lines) > y + 3 and lines[y+1][x] + lines[y+2][x] + lines[y+3][x] == word[1:]:
-        count += 1
-    if y - 3 >= 0 and lines[y-1][x] + lines[y-2][x] + lines[y-3][x] == word[1:]:
-        count += 1
+    count = 0
 
-    # Check diagonal
-    if y - 3 >= 0:
-        if len(lines[y-3]) > x + 3 and lines[y-1][x+1] + lines[y-2][x+2] + lines[y-3][x+3] == word[1:]:
-            count += 1
-        if x - 3 >= 0 and lines[y-1][x-1] + lines[y-2][x-2] + lines[y-3][x-3] == word[1:]:
-            count += 1
-    if len(lines) > y + 3:
-        if len(lines[y+3]) > x + 3 and lines[y+1][x+1] + lines[y+2][x+2] + lines[y+3][x+3] == word[1:]:
-            count += 1
-        if x - 3 >= 0 and lines[y+1][x-1] + lines[y+2][x-2] + lines[y+3][x-3] == word[1:]:
-            count += 1
+    directions = []
+    for i in range(-1, 2):
+        for j in range(-1, 2):
+            if i != 0 or j != 0:
+                directions.append((i, j))
+    
+    for dx, dy in directions:
+        for i, letter in enumerate(WORD):
+            curr_x = x + dx * i
+            curr_y = y + dy * i
+            if not (0 <= curr_x < WIDTH and 0 <= curr_y < HEIGHT):
+                break
+            if board[curr_y][curr_x] != letter:
+                break
+            if i == len(WORD) - 1:
+                count += 1
         
-
     return count
 
 ans = 0
 
-for y in range(len(lines)):
-    for x in range(len(lines[y])):
+WORD = "XMAS"
+HEIGHT = len(board)
+WIDTH =  len(board[0])
+
+for y in range(HEIGHT):
+    for x in range(WIDTH):
         ans += check(x, y)
 
 print(ans)

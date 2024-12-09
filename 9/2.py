@@ -51,7 +51,6 @@ for i in range(len(memory) - 1, 0, -1):
                     moved_blocks.add(block[0])
                 block = [memory[i]]
     elif len(block) > 0:
-        block_index = int(block[0])
         if block[0] not in moved_blocks:
             switch(memory, free, block, i + 1)
             moved_blocks.add(block[0])

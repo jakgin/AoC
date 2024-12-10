@@ -19,7 +19,7 @@ for i in range(1, 3):
     file_path = os.path.join(new_folder_path, f"{i}.py")
     with open(file_path, "w") as file:
         file.write(
-"""with open("input.txt") as f:
+"""with open("in") as f:
     line = f.read().strip()
 """
         )

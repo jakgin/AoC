@@ -24,7 +24,7 @@ for i in range(1, 3):
 """
         )
 
-file_path = os.path.join(new_folder_path, "input.txt")
+file_path = os.path.join(new_folder_path, "in")
 with open(file_path, "w") as f:
     ...
 

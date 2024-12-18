@@ -1,15 +1,20 @@
-from tqdm import tqdm
 from collections import deque
 
 
 with open("in") as f:
     lines = f.read().strip().split("\n")
+    tmp = []
+    for line in lines:
+        x, y = line.split(",")
+        tmp.append((int(x), int(y)))
+    lines = tmp
 
 w = 71
 h = 71
 
 
 def shortest_path():
+    # BFS
     def neighbors(coord):
         nbors = []
         x, y, cost = coord
@@ -23,7 +28,7 @@ def shortest_path():
                 nbors.append((nx, ny, cost + 1))
                 seen.add((nx, ny))
         return nbors
-            
+
     start = (0, 0, 0)  # x, y, cost
     q = deque([start])
     seen = set((0, 0))
@@ -35,13 +40,22 @@ def shortest_path():
     return -1
 
 
-obstacles = set(lines[:1024])
+# Binary Search
 
-for i in tqdm(range(1024, 3451)):
-    x, y = lines[i].split(",")
-    obstacles.add((int(x), int(y)))
+low, high = 1024, len(lines) - 1
 
+while low <= high:
+    mid = low + (high - low) // 2
+    obstacles = set(lines[:mid])
     cost = shortest_path()
-    if cost == -1:
-        print(f"{x},{y}")
-        break
+    if cost != -1:
+        obstacles.add(lines[mid])
+        cost = shortest_path()
+        if cost == -1:
+            x, y = lines[mid]
+            print(f"{x},{y}")
+            break
+        else:
+            low = mid
+    else:
+        high = mid - 1

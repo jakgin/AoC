@@ -11,6 +11,8 @@ for folder_name in os.listdir(current_dir):
 
 # Create the next numbered folder
 new_folder_name = str(max_num + 1)
+if len(new_folder_name) == 1:
+    new_folder_name = "0" + new_folder_name
 new_folder_path = os.path.join(current_dir, new_folder_name)
 os.makedirs(new_folder_path)
 

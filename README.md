@@ -1,1 +1,1 @@
-# My solutions for [*Advent of Code*](https://adventofcode.com/)
+# My solutions for <a href="https://adventofcode.com/" target="_blank">*Advent of Code*</a>

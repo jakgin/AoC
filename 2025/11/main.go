@@ -9,39 +9,46 @@ import (
 
 func main() {
 	graph := GetInput("in.txt")
-	// sol1 := NumberOfPaths(graph, "you", "out")
-	sol2 := NumberOfPathsInludingItems(graph, "svr", "out", []string{"dac", "fft"})
-	fmt.Println(sol2)
+	// sol := NumberOfPaths(graph, "you", "out")
+	sol := CountPaths(graph, "you", "out")
+	// sol := NumberOfPathsInludingItems(graph, "svr", "out", "dac", "fft")
+	// sol := NumberOfPathsInludingItems(graph, "you", "out", "dxj", "dnq")
+	fmt.Println(sol)
 }
 
-func NumberOfPathsInludingItems(graph map[string][]string, start, end string, items []string) int {
-	paths := 0
-	nodesToProcess := []GraphNode{{start, nil}}
+// Consider paths: (start -> a -> b -> end) OR (start -> b -> a -> end)
+func NumberOfPathsInludingItems(graph map[string][]string, start, end, a, b string) int {
+	paths1 := CountPaths(graph, start, a)
+	paths1 *= CountPaths(graph, a, b)
+	paths1 *= CountPaths(graph, b, end)
 
-	for len(nodesToProcess) != 0 {
-		node := nodesToProcess[0]
-		fmt.Println("Considering node:", node)
-		nodesToProcess = nodesToProcess[1:]
+	paths2 := CountPaths(graph, start, b)
+	paths2 *= CountPaths(graph, b, a)
+	paths2 *= CountPaths(graph, a, end)
 
-		if node.item == end {
-			if pathContainItems(node, items) {
-				paths++
-			}
-			continue
-		}
+	return paths1 + paths2
+}
 
-		if nodeIsRepeating(node) {
-			fmt.Println("node is repeating")
-			continue
-		}
+// topological sort and counting
+// Pseudocode:
+//
+// countPaths(G, A, B):
+//
+//	topo = topologicalSort(G)
+//
+//	for each vertex v in G:
+//	    dp[v] = 0
+//
+//	dp[A] = 1
+//
+//	for u in topo:
+//	    for each v in outgoingEdges(u):
+//	        dp[v] += dp[u]
+//
+//	return dp[B]
+func CountPaths(graph map[string][]string, a, b string) int {
 
-		nextItems := graph[node.item]
-		for _, nextItem := range nextItems {
-			nodesToProcess = append(nodesToProcess, GraphNode{nextItem, &node})
-		}
-	}
-
-	return paths
+	return 0
 }
 
 func nodeIsRepeating(node GraphNode) bool {

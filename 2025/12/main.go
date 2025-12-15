@@ -8,76 +8,106 @@ import (
 )
 
 func main() {
-	sol := 0
 	presents, regions := GetInput(os.Args[1])
 
-	for i, region := range regions {
-		canFit := CanPresentsFit(presents, region)
-		log := "Region: %d/%d"
-		if canFit {
-			sol++
-			log += " fit"
-		}
-		fmt.Printf(log+"\n", i+1, len(regions))
-	}
+	sol := sol2(presents, regions)
 
 	fmt.Println(sol)
 }
 
-// TODO: Optimization: keep track of the squares to check in a grid (only those that connect to wall or another present)
-func CanPresentsFit(presents []Present, region *Region) bool {
-	presentsWithRotations := make([][]Present, len(presents))
-	for i := range presentsWithRotations {
-		presentsWithRotations[i] = presents[i].GetPresentRotations()
+// Sol1 tries to find best present and its location for given grid state and put it there based on present connectivity
+// with the walls and other presents. (Runs 15 min on i5-12400f)
+func sol1(presents []Present, regions []*Region) int {
+	sol := 0
+
+	for i, region := range regions {
+		canFit := CanPresentsFit(presents, region)
+		log := "Region: %d/%d - %.2f"
+		if canFit {
+			sol++
+			log += " fit"
+		}
+		fmt.Printf(log+"\n", i+1, len(regions), region.FilledRatio()*100)
 	}
 
-	for true {
-		noPresentFit := true
-		bestPresentFit := -1
-		var bestPresent Present
-		var location Point
+	return sol
+}
 
-		for presentIndex, presentRotations := range presentsWithRotations {
-			for _, present := range presentRotations {
-				if region.presentsToPlace[presentIndex] == 0 {
-					break
+// Sol2 checks what is the sum of volume of all presents to place on the grid.
+// It assumes that presents can be placed based on some volume treshhold.
+// For my input, treshold from 0.75 to 1.0 gives the right solution (solution instantly)
+func sol2(presents []Present, regions []*Region) int {
+	sol := 0
+	treshold := 0.85
+
+	presentFills := make([]int, len(presents))
+	for i, present := range presents {
+		fills := 0
+
+		for _, row := range present.grid {
+			for _, cell := range row {
+				if cell == PresentCell {
+					fills++
 				}
-
-				for y := range len(region.grid) {
-					for x := range len(region.grid[0]) {
-						l := Point{x, y}
-						presentFit, err := region.countWalls(present, l)
-
-						if err != nil {
-							continue
-						}
-
-						if presentFit > bestPresentFit {
-							bestPresentFit = presentFit
-							bestPresent = present
-							location = l
-							noPresentFit = false
-						}
-					}
-				}
-
 			}
 		}
 
-		if noPresentFit {
-			break
-		}
-
-		region.placePresent(bestPresent, location)
+		presentFills[i] = fills
 	}
 
-	for _, presentsNotPlaced := range region.presentsToPlace {
-		if presentsNotPlaced != 0 {
-			return false
+	for _, region := range regions {
+		fillCount := 0
+		for presentId, n := range region.presentsToPlace {
+			fillCount += n * presentFills[presentId]
+		}
+		ratio := float64(fillCount) / float64(len(region.grid)*len(region.grid[0]))
+		if ratio < treshold {
+			sol++
 		}
 	}
 
-	return true
+	return sol
+}
+
+func CanPresentsFit(presents []Present, region *Region) bool {
+	presentsWithRotations := PresentsWithRotations(presents)
+
+	for anyPresentFit := true; anyPresentFit; {
+		anyPresentFit = false
+		bestPresentFit := -1
+		var bestPresent Present
+		var bestLocation Point
+
+		for _, present := range presentsWithRotations {
+			if region.presentsToPlace[present.id] == 0 {
+				continue
+			}
+
+			for y := range region.grid {
+				for x := range region.grid[y] {
+					location := Point{x, y}
+					presentFit, err := region.countWalls(present, location)
+
+					if err != nil {
+						continue
+					}
+
+					if presentFit > bestPresentFit {
+						bestPresentFit = presentFit
+						bestPresent = present
+						bestLocation = location
+						anyPresentFit = true
+					}
+				}
+			}
+		}
+
+		if anyPresentFit {
+			region.placePresent(bestPresent, bestLocation)
+		}
+	}
+
+	return SumInts(region.presentsToPlace) == 0
 }
 
 func GetInput(filename string) ([]Present, []*Region) {
@@ -126,6 +156,22 @@ func GetInput(filename string) ([]Present, []*Region) {
 	}
 
 	return presents, regions
+}
+
+func SumInts(nums []int) int {
+	sum := 0
+	for _, n := range nums {
+		sum += n
+	}
+	return sum
+}
+
+func PresentsWithRotations(presents []Present) []Present {
+	presentsWithRotations := make([]Present, 0, len(presents)*4)
+	for _, present := range presents {
+		presentsWithRotations = append(presentsWithRotations, present.GetPresentRotations()...)
+	}
+	return presentsWithRotations
 }
 
 const PresentCell = '#'
@@ -291,6 +337,18 @@ func (r *Region) countWalls(present Present, location Point) (int, error) {
 	}
 
 	return count, nil
+}
+
+func (r *Region) FilledRatio() float64 {
+	filled := 0.0
+	for _, row := range r.grid {
+		for _, cell := range row {
+			if cell == PresentCell {
+				filled++
+			}
+		}
+	}
+	return filled / float64(len(r.grid)*len(r.grid[0]))
 }
 
 func ShowRegions(regions []*Region) {

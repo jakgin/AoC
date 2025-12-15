@@ -8,43 +8,37 @@ import (
 )
 
 func main() {
+	sol := 0
 	presents, regions := GetInput(os.Args[1])
 
-	sol := sol1(presents, regions)
-	fmt.Println(sol)
-
-	// ShowRegions(regions)
-}
-
-func sol1(presents []Present, regions []*Region) int {
-	sol := 0
-
 	for i, region := range regions {
-		fmt.Printf("Region: %d/%d\n", i+1, len(regions))
-		if CanPresentsFit(presents, region) {
+		canFit := CanPresentsFit(presents, region)
+		log := "Region: %d/%d"
+		if canFit {
 			sol++
+			log += " fit"
 		}
+		fmt.Printf(log+"\n", i+1, len(regions))
 	}
 
-	return sol
+	fmt.Println(sol)
 }
 
+// TODO: Optimization: keep track of the squares to check in a grid (only those that connect to wall or another present)
 func CanPresentsFit(presents []Present, region *Region) bool {
 	presentsWithRotations := make([][]Present, len(presents))
 	for i := range presentsWithRotations {
 		presentsWithRotations[i] = presents[i].GetPresentRotations()
 	}
 
-	bestPresentId := 0
-	bestPresentRotationId := 0
-	bestPresentFit := -1
-	var location Point
-
 	for true {
-		bestPresentFit = -1
+		noPresentFit := true
+		bestPresentFit := -1
+		var bestPresent Present
+		var location Point
 
 		for presentIndex, presentRotations := range presentsWithRotations {
-			for presentRotationId, present := range presentRotations {
+			for _, present := range presentRotations {
 				if region.presentsToPlace[presentIndex] == 0 {
 					break
 				}
@@ -52,12 +46,17 @@ func CanPresentsFit(presents []Present, region *Region) bool {
 				for y := range len(region.grid) {
 					for x := range len(region.grid[0]) {
 						l := Point{x, y}
-						presentFit := region.countWalls(present, l)
+						presentFit, err := region.countWalls(present, l)
+
+						if err != nil {
+							continue
+						}
+
 						if presentFit > bestPresentFit {
 							bestPresentFit = presentFit
-							bestPresentId = presentIndex
-							bestPresentRotationId = presentRotationId
+							bestPresent = present
 							location = l
+							noPresentFit = false
 						}
 					}
 				}
@@ -65,11 +64,11 @@ func CanPresentsFit(presents []Present, region *Region) bool {
 			}
 		}
 
-		if bestPresentFit == -1 {
+		if noPresentFit {
 			break
 		}
 
-		region.placePresent(presentsWithRotations[bestPresentId][bestPresentRotationId], bestPresentId, location)
+		region.placePresent(bestPresent, location)
 	}
 
 	for _, presentsNotPlaced := range region.presentsToPlace {
@@ -95,11 +94,11 @@ func GetInput(filename string) ([]Present, []*Region) {
 		lines := strings.Split(present, "\n")
 		present := lines[1:]
 
-		presentGrid := make(Present, len(present))
+		presentGrid := make(Grid, len(present))
 		for j, line := range present {
 			presentGrid[j] = []byte(line)
 		}
-		presents[i] = presentGrid
+		presents[i] = Present{id: i, grid: presentGrid}
 	}
 
 	for i, sector := range regionSectors {
@@ -132,12 +131,16 @@ func GetInput(filename string) ([]Present, []*Region) {
 const PresentCell = '#'
 const EmptyCell = '.'
 
-type Present [][]byte
+type Present struct {
+	id   int
+	grid Grid
+}
 
 func (p Present) String() string {
 	s := strings.Builder{}
 
-	for _, row := range p {
+	fmt.Fprintf(&s, "Id: %d\n", p.id)
+	for _, row := range p.grid {
 		fmt.Fprintln(&s, string(row))
 	}
 
@@ -146,26 +149,28 @@ func (p Present) String() string {
 
 func (p Present) GetPresentRotations() []Present {
 	presents := make([]Present, 4)
+
 	for i := range 4 {
-		presents[i] = make(Present, len(p))
-		for j := range presents[i] {
-			presents[i][j] = make([]byte, len(p[j]))
+		grid := make(Grid, len(p.grid))
+		for rowI := range grid {
+			grid[rowI] = make([]byte, len(p.grid[rowI]))
 		}
+		presents[i] = Present{p.id, grid}
 	}
 
-	for y := range len(p) {
-		for x := range len(p[0]) {
+	for y := range len(p.grid) {
+		for x := range len(p.grid[y]) {
 			// 0% rotation
-			presents[0][y][x] = p[y][x]
+			presents[0].grid[y][x] = p.grid[y][x]
 
 			// 90° rotation
-			presents[1][x][len(p)-1-y] = p[y][x]
+			presents[1].grid[x][len(p.grid)-1-y] = p.grid[y][x]
 
 			// 180° rotation
-			presents[2][len(p)-1-y][len(p[0])-1-x] = p[y][x]
+			presents[2].grid[len(p.grid)-1-y][len(p.grid[0])-1-x] = p.grid[y][x]
 
 			// 270° rotation
-			presents[3][len(p[0])-1-x][y] = p[y][x]
+			presents[3].grid[len(p.grid[0])-1-x][y] = p.grid[y][x]
 		}
 	}
 
@@ -179,7 +184,7 @@ func ShowPresents(presents []Present) {
 }
 
 type Region struct {
-	grid            [][]byte
+	grid            Grid
 	presentsToPlace []int
 }
 
@@ -198,11 +203,10 @@ func (r *Region) String() string {
 	return buf.String()
 }
 
-// Place present on the grid in location. Return false if present can't be put in this location
-func (r *Region) placePresent(present Present, presentId int, location Point) bool {
-	for y := range len(present) {
-		for x := range len(present[0]) {
-			if present[y][x] == EmptyCell {
+func (r *Region) canPlacePresent(present Present, location Point) bool {
+	for y := range len(present.grid) {
+		for x := range len(present.grid[y]) {
+			if present.grid[y][x] == EmptyCell {
 				continue
 			}
 
@@ -215,47 +219,45 @@ func (r *Region) placePresent(present Present, presentId int, location Point) bo
 		}
 	}
 
-	for y := range len(present) {
-		for x := range len(present[0]) {
-			if present[y][x] == EmptyCell {
-				continue
-			}
-
-			gridY := y + location.Y
-			gridX := x + location.X
-
-			r.grid[gridY][gridX] = present[y][x]
-		}
-	}
-
-	r.presentsToPlace[presentId]--
-
 	return true
 }
 
-// Check how many walls does present touch in specified location, returns -1 if present can't be placed in location
-func (r *Region) countWalls(present Present, location Point) int {
-	for y := range len(present) {
-		for x := range len(present[0]) {
-			if present[y][x] == EmptyCell {
+// Place present on the grid in specified location. Return an error if present can't be placed
+func (r *Region) placePresent(present Present, location Point) error {
+	if !r.canPlacePresent(present, location) {
+		return fmt.Errorf("Present can't be put in location %v", location)
+	}
+
+	for y := range len(present.grid) {
+		for x := range len(present.grid[y]) {
+			if present.grid[y][x] == EmptyCell {
 				continue
 			}
 
 			gridY := y + location.Y
 			gridX := x + location.X
 
-			if gridY >= len(r.grid) || gridX >= len(r.grid[0]) || r.grid[gridY][gridX] == PresentCell {
-				return -1
-			}
+			r.grid[gridY][gridX] = present.grid[y][x]
 		}
+	}
+
+	r.presentsToPlace[present.id]--
+
+	return nil
+}
+
+// Check how many walls does present touch in specified location, returns error if present can't be placed there
+func (r *Region) countWalls(present Present, location Point) (int, error) {
+	if !r.canPlacePresent(present, location) {
+		return 0, fmt.Errorf("Present can't be put in location %v", location)
 	}
 
 	count := 0
 	visited := make(map[Point]struct{})
 
-	for y := range len(present) {
-		for x := range len(present[0]) {
-			if present[y][x] == EmptyCell {
+	for y := range len(present.grid) {
+		for x := range len(present.grid[y]) {
+			if present.grid[y][x] == EmptyCell {
 				continue
 			}
 
@@ -288,7 +290,7 @@ func (r *Region) countWalls(present Present, location Point) int {
 		}
 	}
 
-	return count
+	return count, nil
 }
 
 func ShowRegions(regions []*Region) {
@@ -300,3 +302,5 @@ func ShowRegions(regions []*Region) {
 type Point struct {
 	X, Y int
 }
+
+type Grid [][]byte

@@ -3,21 +3,25 @@ package main
 import (
 	"fmt"
 	"os"
-	"slices"
 	"strings"
+	"time"
 )
 
 func main() {
+	tStart := time.Now()
+
 	graph := GetInput("in.txt")
-	// sol := NumberOfPaths(graph, "you", "out")
-	sol := CountPaths(graph, "you", "out")
-	// sol := NumberOfPathsInludingItems(graph, "svr", "out", "dac", "fft")
-	// sol := NumberOfPathsInludingItems(graph, "you", "out", "dxj", "dnq")
-	fmt.Println(sol)
+	sol1 := CountPaths(graph, "you", "out")
+	sol2 := CountPathsInludingItems(graph, "svr", "out", "dac", "fft")
+
+	fmt.Println(time.Since(tStart))
+
+	fmt.Println(sol1)
+	fmt.Println(sol2)
 }
 
 // Consider paths: (start -> a -> b -> end) OR (start -> b -> a -> end)
-func NumberOfPathsInludingItems(graph map[string][]string, start, end, a, b string) int {
+func CountPathsInludingItems(graph Graph, start, end, a, b string) int {
 	paths1 := CountPaths(graph, start, a)
 	paths1 *= CountPaths(graph, a, b)
 	paths1 *= CountPaths(graph, b, end)
@@ -29,58 +33,63 @@ func NumberOfPathsInludingItems(graph map[string][]string, start, end, a, b stri
 	return paths1 + paths2
 }
 
-// topological sort and counting
-// Pseudocode:
-//
-// countPaths(G, A, B):
-//
-//	topo = topologicalSort(G)
-//
-//	for each vertex v in G:
-//	    dp[v] = 0
-//
-//	dp[A] = 1
-//
-//	for u in topo:
-//	    for each v in outgoingEdges(u):
-//	        dp[v] += dp[u]
-//
-//	return dp[B]
-func CountPaths(graph map[string][]string, a, b string) int {
+func CountPaths(graph Graph, a, b string) int {
+	sortedNodes := TopologicalSort(graph)
 
-	return 0
-}
-
-func nodeIsRepeating(node GraphNode) bool {
-	items := map[string]struct{}{}
-
-	for currentNode := &node; currentNode != nil; {
-		if _, ok := items[currentNode.item]; ok {
-			return true
-		} else {
-			items[currentNode.item] = struct{}{}
-		}
-
-		currentNode = currentNode.prev
+	paths := map[string]int{}
+	for node := range graph {
+		paths[node] = 0
 	}
 
-	return false
-}
+	paths[a] = 1
 
-func pathContainItems(node GraphNode, items []string) bool {
-	countItems := 0
-
-	for currentNode := &node; currentNode != nil; {
-		if slices.Contains(items, currentNode.item) {
-			countItems++
+	for _, sortedNode := range sortedNodes {
+		for _, node := range graph[sortedNode] {
+			paths[node] += paths[sortedNode]
 		}
-		currentNode = currentNode.prev
 	}
 
-	return countItems == len(items)
+	return paths[b]
 }
 
-func NumberOfPaths(graph map[string][]string, start, end string) int {
+func TopologicalSort(graph Graph) []string {
+	connections := map[string]int{}
+	for node := range graph {
+		connections[node] = 0
+	}
+
+	for _, nextNodes := range graph {
+		for _, node := range nextNodes {
+			connections[node]++
+		}
+	}
+
+	zeroNodes := make([]string, 0)
+	for node, count := range connections {
+		if count == 0 {
+			zeroNodes = append(zeroNodes, node)
+		}
+	}
+
+	sortedNodes := make([]string, 0, len(graph))
+
+	for len(zeroNodes) > 0 {
+		currentNode := zeroNodes[0]
+		zeroNodes = zeroNodes[1:]
+		sortedNodes = append(sortedNodes, currentNode)
+
+		for _, neighbor := range graph[currentNode] {
+			connections[neighbor]--
+			if connections[neighbor] == 0 {
+				zeroNodes = append(zeroNodes, neighbor)
+			}
+		}
+	}
+
+	return sortedNodes
+}
+
+func NumberOfPaths(graph Graph, start, end string) int {
 	paths := 0
 	itemsToProcess := []string{start}
 
@@ -99,11 +108,11 @@ func NumberOfPaths(graph map[string][]string, start, end string) int {
 	return paths
 }
 
-func GetInput(filename string) map[string][]string {
+func GetInput(filename string) Graph {
 	file, _ := os.ReadFile(filename)
 	lines := strings.Split(string(file), "\n")
 
-	graph := map[string][]string{}
+	graph := Graph{}
 	for _, line := range lines {
 		items := strings.Split(line, " ")
 		key := items[0][:len(items[0])-1]
@@ -113,7 +122,7 @@ func GetInput(filename string) map[string][]string {
 	return graph
 }
 
-func ShowGraph(graph map[string][]string) {
+func ShowGraph(graph Graph) {
 	for k, v := range graph {
 		fmt.Println(k, v)
 	}
@@ -123,3 +132,5 @@ type GraphNode struct {
 	item string
 	prev *GraphNode
 }
+
+type Graph map[string][]string
